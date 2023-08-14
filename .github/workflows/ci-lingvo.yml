@@ -30,7 +30,7 @@ jobs:
         include:
           - name: TensorFlow+Lingvo 2.9.0v1 (Keras 2.9.0 Python 3.8)
             framework: tensorflow2v1
-            python: 3.8
+            python: 3.9
             tensorflow: 2.9.3
             tf_version: v2
             keras: 2.9.0
