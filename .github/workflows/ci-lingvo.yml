@@ -53,6 +53,8 @@ jobs:
           pip install tensorflow==${{ matrix.tensorflow }}
           pip install keras==${{ matrix.keras }}
           pip install lingvo==${{ matrix.lingvo }}
+          pip install tensorflow-addons==0.18.0
+          pip install model-pruning-google-research==0.0.5
           pip list
       - name: Run ${{ matrix.name }} Tests
         run: ./run_tests.sh ${{ matrix.framework }}
