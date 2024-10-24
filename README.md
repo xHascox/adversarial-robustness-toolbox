@@ -21,7 +21,7 @@
 <p align="center">
   <img src="https://raw.githubusercontent.com/lfai/artwork/master/lfaidata-assets/lfaidata-project-badge/graduate/color/lfaidata-project-badge-graduate-color.png" alt="LF AI & Data" width="300"/>
 </p>
-
+ 
 Adversarial Robustness Toolbox (ART) is a Python library for Machine Learning Security. ART is hosted by the 
 [Linux Foundation AI & Data Foundation](https://lfaidata.foundation) (LF AI & Data). ART provides tools that enable
 developers and researchers to defend and evaluate Machine Learning models and applications against the
