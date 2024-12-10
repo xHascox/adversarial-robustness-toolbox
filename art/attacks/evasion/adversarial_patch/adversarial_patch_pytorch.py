@@ -481,7 +481,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         Generate an adversarial patch and return the patch and its mask in arrays.
 
         :param x: An array with the original input images of shape NCHW or input videos of shape NFCHW.
-        :param y: Untargeted attack: An array with the original true labels. Targeted Attack: The target labels (boxes and classes)
+        :param y: An array with the original true labels.
         :param mask: A boolean array of shape equal to the shape of a single samples (1, H, W) or the shape of `x`
                      (N, H, W) without their channel dimensions. Any features for which the mask is True can be the
                      center location of the patch during sampling.
