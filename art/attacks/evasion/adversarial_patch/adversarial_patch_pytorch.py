@@ -833,8 +833,10 @@ class AdversarialPatchPyTorch(EvasionAttack):
                 drop_last=False,
             )
 
+        training_loss = []
         for i_iter in trange(self.max_iter, desc="Adversarial Patch PyTorch", disable=not self.verbose):
             if mask is None:
+                loss_cum = 0
                 for images, target in data_loader:
                     images = images.to(self.estimator.device)
                     if isinstance(target, torch.Tensor):
@@ -850,7 +852,8 @@ class AdversarialPatchPyTorch(EvasionAttack):
                                 }
                             )
                         target = targets
-                    _ = self._train_step(images=images, target=target, mask=None)
+                    loss_train_batch = self._train_step(images=images, target=target, mask=None) # TODO TRACCK LOSS
+                
             else:
                 for images, target, mask_i in data_loader:
                     images = images.to(self.estimator.device)
