@@ -46,7 +46,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-interpolation = torchvision.transforms.InterpolationMode.BILINEAR,
+interpolation = torchvision.transforms.InterpolationMode.BILINEAR
 
 class AdversarialPatchPyTorch(EvasionAttack):
     """
