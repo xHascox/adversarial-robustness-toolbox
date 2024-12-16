@@ -66,6 +66,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         "targeted",
         "summary_writer",
         "verbose",
+        "pretrained_patch",
     ]
 
     _estimator_requirements = (BaseEstimator, NeuralNetworkMixin)
@@ -87,6 +88,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         targeted: bool = True,
         summary_writer: str | bool | SummaryWriter = False,
         verbose: bool = True,
+        pretrained_patch: np.ndarray | None = None,
     ):
         """
         Create an instance of the :class:`.AdversarialPatchPyTorch`.
@@ -118,6 +120,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
                                Use hierarchical folder structure to compare between runs easily. e.g. pass in
                                ‘runs/exp1’, ‘runs/exp2’, etc. for each new experiment to compare across them.
         :param verbose: Show progress bars.
+        :pretrained_patch: A pretrained patch to continue training, or a target image to apply disturbance to
         """
         import torch
         import torchvision
@@ -146,6 +149,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         self.image_shape = estimator.input_shape
         self.targeted = targeted
         self.verbose = verbose
+        self.pretrained_patch = pretrained_patch # TODO make this real
         self._check_params()
 
         self.i_h_patch = 1
@@ -176,7 +180,11 @@ class AdversarialPatchPyTorch(EvasionAttack):
             0
         ]
         self._initial_value = np.ones(self.patch_shape) * mean_value
-        self._patch = torch.tensor(self._initial_value, requires_grad=True, device=self.estimator.device)
+        if self.pretrained_patch is not None:
+            self._patch = torch.tensor(self.pretrained_patch, requires_grad=True, dtype=torch.float32, device=self.estimator.device)
+        else:
+            self._patch = torch.tensor(self._initial_value, requires_grad=True, device=self.estimator.device)
+        
 
         self._optimizer_string = optimizer
         if self._optimizer_string == "Adam":
