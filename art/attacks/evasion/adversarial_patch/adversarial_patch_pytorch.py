@@ -836,7 +836,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         training_loss = []
         for i_iter in trange(self.max_iter, desc="Adversarial Patch PyTorch", disable=not self.verbose):
             if mask is None:
-                loss_cum = 0
+                loss_epoch = []
                 for images, target in data_loader:
                     images = images.to(self.estimator.device)
                     if isinstance(target, torch.Tensor):
@@ -853,6 +853,10 @@ class AdversarialPatchPyTorch(EvasionAttack):
                             )
                         target = targets
                     loss_train_batch = self._train_step(images=images, target=target, mask=None) # TODO TRACCK LOSS
+                    #print("-----")
+                    #print(loss_train_batch.item())
+                    loss_epoch.append(loss_train_batch.item())    
+            
                 
             else:
                 for images, target, mask_i in data_loader:
@@ -872,6 +876,8 @@ class AdversarialPatchPyTorch(EvasionAttack):
                         target = targets
                     mask_i = mask_i.to(self.estimator.device)
                     _ = self._train_step(images=images, target=target, mask=mask_i)
+
+            training_loss.append(loss_epoch)
 
             # Write summary
             if self.summary_writer is not None:  # pragma: no cover
@@ -901,6 +907,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         return (
             self._patch.detach().cpu().numpy(),
             self._get_circular_patch_mask(nb_samples=1).cpu().numpy()[0],
+            training_loss,
         )
 
     def _check_mask(self, mask: np.ndarray | None, x: np.ndarray) -> np.ndarray | None:
