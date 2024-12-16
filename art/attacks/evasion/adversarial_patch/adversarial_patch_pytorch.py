@@ -27,6 +27,7 @@ import logging
 import math
 from packaging.version import parse
 from typing import Any, TYPE_CHECKING
+import torchvision
 
 import numpy as np
 from tqdm.auto import trange
@@ -45,6 +46,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+interpolation = torchvision.transforms.InterpolationMode.BILINEAR,
 
 class AdversarialPatchPyTorch(EvasionAttack):
     """
@@ -472,7 +474,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
                 translate=[x_shift, y_shift],
                 scale=im_scale,
                 shear=[0, 0],
-                interpolation=torchvision.transforms.InterpolationMode.NEAREST,
+                interpolation=interpolation,
                 fill=None,
             )
 
@@ -490,7 +492,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
                 translate=[x_shift, y_shift],
                 scale=im_scale,
                 shear=[0, 0],
-                interpolation=torchvision.transforms.InterpolationMode.NEAREST,
+                interpolation=interpolation, # NEAREST or BILINEAR
                 fill=None,
             )
 
@@ -681,7 +683,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
                 translate=[x_shift, y_shift],
                 scale=im_scale,
                 shear=[0, 0],
-                interpolation=torchvision.transforms.InterpolationMode.NEAREST,
+                interpolation=interpolation,
                 fill=None,
             )
 
@@ -699,7 +701,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
                 translate=[x_shift, y_shift],
                 scale=im_scale,
                 shear=[0, 0],
-                interpolation=torchvision.transforms.InterpolationMode.NEAREST,
+                interpolation=interpolation,
                 fill=None,
             )
 
