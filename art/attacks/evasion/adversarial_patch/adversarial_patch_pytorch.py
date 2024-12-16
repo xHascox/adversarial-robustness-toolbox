@@ -91,6 +91,8 @@ class AdversarialPatchPyTorch(EvasionAttack):
         summary_writer: str | bool | SummaryWriter = False,
         verbose: bool = True,
         pretrained_patch: np.ndarray | None = None,
+        contrast_min: int = 1,
+        contrast_max: int = 1,
     ):
         """
         Create an instance of the :class:`.AdversarialPatchPyTorch`.
@@ -123,6 +125,8 @@ class AdversarialPatchPyTorch(EvasionAttack):
                                ‘runs/exp1’, ‘runs/exp2’, etc. for each new experiment to compare across them.
         :param verbose: Show progress bars.
         :pretrained_patch: A pretrained patch to continue training, or a target image to apply disturbance to
+        :contrast_min: between 0 and contrast_max, 0 reduces all contrast of the patch
+        :contrast_max: should probably be 1 
         """
         import torch
         import torchvision
@@ -151,7 +155,9 @@ class AdversarialPatchPyTorch(EvasionAttack):
         self.image_shape = estimator.input_shape
         self.targeted = targeted
         self.verbose = verbose
-        self.pretrained_patch = pretrained_patch # TODO make this real
+        self.pretrained_patch = pretrained_patch
+        self.contrast_min = contrast_min
+        self.contrast_max = contrast_max
         self._check_params()
 
         self.i_h_patch = 1
@@ -365,6 +371,12 @@ class AdversarialPatchPyTorch(EvasionAttack):
 
         image_mask = image_mask.float()
 
+        # Apply contrast adjustment:
+        contrast_alpha = np.random.uniform(self.contrast_min, self.contrast_max)
+        mid_gray_value = 127
+        patch = (patch * contrast_alpha) + ((1 - contrast_alpha) * mid_gray_value)
+
+
         patch = patch.float()
         padded_patch = torch.stack([patch] * nb_samples)
 
@@ -496,6 +508,10 @@ class AdversarialPatchPyTorch(EvasionAttack):
                 fill=None,
             )
 
+            
+
+
+
             # calculate the patch location:
             # Calculate the top-left corner of the patch (approximated)
             center_x = images.shape[3] // 2 # Image width / 2
@@ -574,6 +590,10 @@ class AdversarialPatchPyTorch(EvasionAttack):
             image_mask = torch.repeat_interleave(image_mask, dim=1, repeats=self.input_shape[0])
 
         image_mask = image_mask.float()
+
+        contrast_alpha = np.random.uniform(self.contrast_min, self.contrast_max)
+        mid_gray_value = 127
+        patch = (patch * contrast_alpha) + ((1 - contrast_alpha) * mid_gray_value)
 
         patch = patch.float()
         padded_patch = torch.stack([patch] * nb_samples)
