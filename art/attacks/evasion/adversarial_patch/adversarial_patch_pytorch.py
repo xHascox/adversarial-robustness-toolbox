@@ -71,6 +71,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         "verbose",
         "pretrained_patch",
         "disguise",
+        "disguise_distance_factor",
     ]
 
     _estimator_requirements = (BaseEstimator, NeuralNetworkMixin)
@@ -96,6 +97,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         contrast_min: int = 1,
         contrast_max: int = 1,
         disguise: np.ndarray | None = None,
+        disguise_distance_factor: float = 1,
     ):
         """
         Create an instance of the :class:`.AdversarialPatchPyTorch`.
@@ -131,6 +133,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         :contrast_min: between 0 and contrast_max, 0 reduces all contrast of the patch
         :contrast_max: should probably be 1 
         :disguise: What the patch should look like
+        disguise_distance_factor: factor/weight of the disguise distance
         """
         import torch
         import torchvision
@@ -166,6 +169,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         self.contrast_max = contrast_max
         self.disguise = torch.tensor(
             disguise.astype(np.float32), requires_grad=True).to(self.estimator.device)
+        self.disguise_distance_factor = disguise_distance_factor
         self._check_params()
 
         self.i_h_patch = 1
@@ -307,8 +311,8 @@ class AdversarialPatchPyTorch(EvasionAttack):
 
             # TODO add distance to disguise to Loss # TODO require gradients?
             if type(self.disguise) != type(None):
-                loss += torch.sqrt(torch.sum((self.disguise -
-                                   self._patch) ** 2))
+                loss += self.disguise_distance_factor * torch.sqrt(torch.sum((self.disguise -
+                                                                              self._patch) ** 2))
 
         if (not self.targeted and self._optimizer_string != "pgd") or self.targeted and self._optimizer_string == "pgd":
             loss = -loss
