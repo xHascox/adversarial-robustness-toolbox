@@ -72,6 +72,8 @@ class AdversarialPatchPyTorch(EvasionAttack):
         "pretrained_patch",
         "disguise",
         "disguise_distance_factor",
+        "split",
+        "gap_size",
     ]
 
     _estimator_requirements = (BaseEstimator, NeuralNetworkMixin)
@@ -98,6 +100,8 @@ class AdversarialPatchPyTorch(EvasionAttack):
         contrast_max: int = 1,
         disguise: np.ndarray | None = None,
         disguise_distance_factor: float = 1,
+        split: bool = False,
+        gap_size: int = 0,
     ):
         """
         Create an instance of the :class:`.AdversarialPatchPyTorch`.
@@ -133,7 +137,9 @@ class AdversarialPatchPyTorch(EvasionAttack):
         :contrast_min: between 0 and contrast_max, 0 reduces all contrast of the patch
         :contrast_max: should probably be 1 
         :disguise: What the patch should look like
-        disguise_distance_factor: factor/weight of the disguise distance
+        :disguise_distance_factor: factor/weight of the disguise distance
+        :split: Collusion attack, splits the patch into two 
+        :gap_size: The gap size when using a collusion attack (2 patchces)
         """
         import torch
         import torchvision
@@ -170,6 +176,8 @@ class AdversarialPatchPyTorch(EvasionAttack):
         self.disguise = torch.tensor(
             disguise.astype(np.float32), requires_grad=True).to(self.estimator.device)
         self.disguise_distance_factor = disguise_distance_factor
+        self.split = split
+        self.gap_size = gap_size
         self._check_params()
 
         self.i_h_patch = 1
@@ -187,6 +195,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
 
         if self.patch_shape[1] != self.patch_shape[2]:  # pragma: no cover
             raise ValueError("Patch height and width need to be the same.")
+            pass
 
         if not (  # pragma: no cover
             self.estimator.postprocessing_defences is None or self.estimator.postprocessing_defences == []
@@ -275,7 +284,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
                 )
 
         else:
-            patched_input, patch_location_list = self._random_overlay_get_patch_location(
+            patched_input, patch_location_list, _ = self._random_overlay_get_patch_location_split(
                 images, self._patch, mask=mask)  # TODO create new targets
             patched_input = torch.clamp(
                 patched_input,
@@ -294,12 +303,30 @@ class AdversarialPatchPyTorch(EvasionAttack):
             # print("label target:", syn_labels)
             syn_targets = []
             for i in range(batch_size):
-                patch_location = patch_location_list[i]
+                boxes = []
+                scores = []
+                labels = []
+                if type(patch_location_list[i]) != list:
+                    patch_location_i = [patch_location_list[i]]
+                else:
+                    patch_location_i = patch_location_list[i]
+
+                for patch_location in patch_location_i:
+                    boxes.append([patch_location[0], patch_location[1],
+                                 patch_location[2], patch_location[3]])
+                    scores.append(syn_scores)
+                    labels.append(syn_labels)
+                synthetic_y = {'boxes': np.array(boxes, dtype=np.float32),
+                               'scores': np.array(scores, dtype=np.float32),
+                               'labels': np.array(labels)}
+                syn_targets.append(synthetic_y)
+
+                """patch_location = patch_location_list[i]
                 # print(patch_location)
                 synthetic_y = {'boxes': np.array([[patch_location[0], patch_location[1], patch_location[2], patch_location[3]]], dtype=np.float32),
                                'scores': np.array([syn_scores], dtype=np.float32),
                                'labels': np.array([syn_labels])}
-                syn_targets.append(synthetic_y)
+                syn_targets.append(synthetic_y)"""
 
             # print("----------------------")
             # print(patched_input.shape)
@@ -352,6 +379,10 @@ class AdversarialPatchPyTorch(EvasionAttack):
         patch: "torch.Tensor",
         scale: float | None = None,
         mask: "torch.Tensor" | None = None,
+        prev_patches: list = [],
+        leave_margin_right: bool = False,
+        gap_size: int = 0,
+        prev_shift_list: list = [],
     ) -> "torch.Tensor":
         """
         Apply the patch but also return its location.
@@ -379,6 +410,8 @@ class AdversarialPatchPyTorch(EvasionAttack):
             interpolation=2,
         )
 
+        # print("mask", self.image_shape[self.i_h],
+        #      image_mask.shape[self.i_h_patch + 1])
         pad_h_before = int(
             (self.image_shape[self.i_h] - image_mask.shape[self.i_h_patch + 1]) / 2)
         pad_h_after = int(
@@ -413,18 +446,23 @@ class AdversarialPatchPyTorch(EvasionAttack):
         patch = patch.float()
         padded_patch = torch.stack([patch] * nb_samples)
 
+        # print("2-", patch.shape)
+
         padded_patch = torchvision.transforms.functional.resize(
             img=padded_patch,
+            # try to keep the aspect ratio
             size=(smallest_image_edge, smallest_image_edge),
             interpolation=2,
         )
-
+        # print("3-", padded_patch.shape)
+        # print("pad", pad_w_before, pad_h_before, pad_w_after, pad_h_after)
         padded_patch = torchvision.transforms.functional.pad(
             img=padded_patch,
             padding=[pad_w_before, pad_h_before, pad_w_after, pad_h_after],
             fill=0,
             padding_mode="constant",
         )
+        # print("4-", padded_patch.shape)
 
         if self.nb_dims == 4:
             padded_patch = torch.unsqueeze(padded_patch, dim=1)
@@ -436,6 +474,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         image_mask_list = []
         padded_patch_list = []
         patch_location_list = []
+        shift_list = []
 
         for i_sample in range(nb_samples):
             if self.patch_location is None:
@@ -448,7 +487,35 @@ class AdversarialPatchPyTorch(EvasionAttack):
                 im_scale = self.patch_shape[self.i_h] / smallest_image_edge
 
             if mask is None:
-                if self.patch_location is None:
+                if self.patch_location is None and not prev_patches:
+                    if leave_margin_right:
+                        padding_after_scaling_h = (
+                            self.image_shape[self.i_h] - im_scale *
+                            padded_patch.shape[self.i_h + 1]
+                        ) / 2.0
+                        padding_after_scaling_w = (
+                            self.image_shape[self.i_w] - 2 * im_scale *
+                            padded_patch.shape[self.i_w + 1] -
+                            gap_size
+                        ) / 2.0
+                    else:
+                        padding_after_scaling_h = (
+                            self.image_shape[self.i_h] - im_scale *
+                            padded_patch.shape[self.i_h + 1]
+                        ) / 2.0
+                        padding_after_scaling_w = (
+                            self.image_shape[self.i_w] - im_scale *
+                            padded_patch.shape[self.i_w + 1]
+                        ) / 2.0
+                    x_shift = np.random.uniform(-padding_after_scaling_w,
+                                                padding_after_scaling_w)
+                    y_shift = np.random.uniform(-padding_after_scaling_h,
+                                                padding_after_scaling_h)
+                elif self.patch_location is None and prev_patches:
+                    padding_h = int(math.floor(
+                        self.image_shape[self.i_h] - self.patch_shape[self.i_h]) / 2.0)
+                    padding_w = int(math.floor(
+                        self.image_shape[self.i_w] - self.patch_shape[self.i_w]) / 2.0)
                     padding_after_scaling_h = (
                         self.image_shape[self.i_h] - im_scale *
                         padded_patch.shape[self.i_h + 1]
@@ -457,10 +524,12 @@ class AdversarialPatchPyTorch(EvasionAttack):
                         self.image_shape[self.i_w] - im_scale *
                         padded_patch.shape[self.i_w + 1]
                     ) / 2.0
-                    x_shift = np.random.uniform(-padding_after_scaling_w,
-                                                padding_after_scaling_w)
-                    y_shift = np.random.uniform(-padding_after_scaling_h,
-                                                padding_after_scaling_h)
+                    x_shift = -padding_w + prev_patches[i_sample][2]
+                    y_shift = -padding_h + prev_patches[i_sample][1]
+                    x_shift = prev_shift_list[i_sample][0] + gap_size + (im_scale *
+                                                                         padded_patch.shape[self.i_h + 1])  # TODO
+                    y_shift = prev_shift_list[i_sample][1]
+
                 else:
                     padding_h = int(math.floor(
                         self.image_shape[self.i_h] - self.patch_shape[self.i_h]) / 2.0)
@@ -468,6 +537,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
                         self.image_shape[self.i_w] - self.patch_shape[self.i_w]) / 2.0)
                     x_shift = -padding_w + self.patch_location[0]
                     y_shift = -padding_h + self.patch_location[1]
+
             else:
                 mask_2d = mask[i_sample, :, :]
 
@@ -579,6 +649,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
             bottom_right_y = center_y + y_shift + (scaled_patch_height // 2)
             # print(patch_top_left_x, patch_top_left_y, bottom_right_x, bottom_right_y)
 
+            shift_list.append((x_shift, y_shift))
             patch_location_list.append(
                 (patch_top_left_x, patch_top_left_y, bottom_right_x, bottom_right_y))
             padded_patch_list.append(padded_patch_i)
@@ -590,12 +661,78 @@ class AdversarialPatchPyTorch(EvasionAttack):
                 self.estimator.device) - image_mask
         )
 
+        # print("-", padded_patch.shape, image_mask.shape)
+        # import matplotlib.pyplot as plt
+        # plt.imshow(image_mask[0].cpu().permute(1, 2, 0))
+        # plt.show()
+        # print(torch.sum(image_mask != 0.).item())
+        # print((images * inverted_mask).shape,
+        #      (padded_patch * image_mask).shape)
         patched_images = images * inverted_mask + padded_patch * image_mask
 
         if not self.estimator.channels_first:
             patched_images = torch.permute(patched_images, (0, 2, 3, 1))
 
-        return patched_images, patch_location_list
+        print("shift", x_shift, y_shift)
+
+        return patched_images, patch_location_list, shift_list
+
+    def _random_overlay_get_patch_location_split(
+        self,
+        images: "torch.Tensor",
+        patch: "torch.Tensor",
+        scale: float | None = None,
+        mask: "torch.Tensor" | None = None,
+        split_keep_both: bool = True,
+        split: bool = False,
+        half_to_keep: str = "right",
+    ) -> "torch.Tensor":
+        """
+        Split the patch into two parts, then apply them and also return their location.
+        returns patched_images, combined_patch_locations, shift_list
+        """
+        if not self.split and not split:
+            return self._random_overlay_get_patch_location(images, patch, scale, mask)
+
+        # Split the patch into left and right halves
+        # print(patch.shape)
+        width_split = patch.shape[self.i_w] // 2
+
+        left_half = patch[:, :, :width_split]
+        right_half = patch[:, :, width_split:]
+        # print(left_half.shape, right_half.shape)
+
+        # import matplotlib.pyplot as plt
+        # plt.imshow(images[0].cpu().detach().permute(1, 2, 0)/255)
+        # plt.show()
+        if not split_keep_both and half_to_keep == "right":
+            left_half = right_half
+        patched_images, patch_location_list_left, shift_list = self._random_overlay_get_patch_location(
+            images, left_half, scale, mask, leave_margin_right=True, gap_size=self.gap_size)
+        print("left", patch_location_list_left)
+
+        # import matplotlib.pyplot as plt
+        # plt.imshow(patched_images[0].cpu().detach().permute(1, 2, 0)/255)
+        # plt.show()
+        if split_keep_both:
+            patched_images, patch_location_list_right, shift_list = self._random_overlay_get_patch_location(
+                patched_images, right_half, scale, mask, prev_patches=patch_location_list_left, prev_shift_list=shift_list, gap_size=self.gap_size)
+            print("right", patch_location_list_right)
+
+            combined_patch_locations = [[left, right] for left, right in zip(
+                patch_location_list_left, patch_location_list_right)]  # This returns two boxes, one for each patch
+
+            combined_patch_locations = [(left[0], right[1], right[2], right[3]) for left, right in zip(
+                patch_location_list_left, patch_location_list_right)]  # This returns one box, over both patches and the gap between them
+        else:
+            combined_patch_locations = patch_location_list_left
+
+        import matplotlib.pyplot as plt
+        plt.imshow(patched_images[0].cpu().detach().permute(1, 2, 0)/255)
+        plt.show()
+        print("combined", combined_patch_locations)
+        print("=====")
+        return patched_images, combined_patch_locations, shift_list
 
     def _random_overlay(
         self,
@@ -1054,6 +1191,10 @@ class AdversarialPatchPyTorch(EvasionAttack):
         scale: float,
         patch_external: np.ndarray | None = None,
         mask: np.ndarray | None = None,
+        split: bool = False,
+        split_keep_both: bool = True,
+        half_to_keep: str = "right",
+        return_patch_outlines: bool = False,
     ) -> np.ndarray:
         """
         A function to apply the learned adversarial patch to images or videos.
@@ -1081,6 +1222,14 @@ class AdversarialPatchPyTorch(EvasionAttack):
                 patch_external).to(self.estimator.device)
         else:
             patch_tensor = self._patch
+
+        if split:
+            patched_images, locations, shifts = self._random_overlay_get_patch_location_split(
+                images=x_tensor, patch=patch_tensor, scale=scale, mask=mask_tensor, split=split, split_keep_both=split_keep_both, half_to_keep=half_to_keep)
+            if return_patch_outlines:
+                return patched_images.detach().cpu().numpy(), locations
+            return patched_images.detach().cpu().numpy()
+
         return (
             self._random_overlay(
                 images=x_tensor, patch=patch_tensor, scale=scale, mask=mask_tensor)
