@@ -673,7 +673,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         if not self.estimator.channels_first:
             patched_images = torch.permute(patched_images, (0, 2, 3, 1))
 
-        print("shift", x_shift, y_shift)
+        # print("shift", x_shift, y_shift)
 
         return patched_images, patch_location_list, shift_list
 
@@ -709,7 +709,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
             left_half = right_half
         patched_images, patch_location_list_left, shift_list = self._random_overlay_get_patch_location(
             images, left_half, scale, mask, leave_margin_right=True, gap_size=self.gap_size)
-        print("left", patch_location_list_left)
+        # print("left", patch_location_list_left)
 
         # import matplotlib.pyplot as plt
         # plt.imshow(patched_images[0].cpu().detach().permute(1, 2, 0)/255)
@@ -717,7 +717,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         if split_keep_both:
             patched_images, patch_location_list_right, shift_list = self._random_overlay_get_patch_location(
                 patched_images, right_half, scale, mask, prev_patches=patch_location_list_left, prev_shift_list=shift_list, gap_size=self.gap_size)
-            print("right", patch_location_list_right)
+            # print("right", patch_location_list_right)
 
             combined_patch_locations = [[left, right] for left, right in zip(
                 patch_location_list_left, patch_location_list_right)]  # This returns two boxes, one for each patch
@@ -728,10 +728,10 @@ class AdversarialPatchPyTorch(EvasionAttack):
             combined_patch_locations = patch_location_list_left
 
         import matplotlib.pyplot as plt
-        plt.imshow(patched_images[0].cpu().detach().permute(1, 2, 0)/255)
-        plt.show()
-        print("combined", combined_patch_locations)
-        print("=====")
+        # plt.imshow(patched_images[0].cpu().detach().permute(1, 2, 0)/255)
+        # plt.show()
+        # print("combined", combined_patch_locations)
+        # print("=====")
         return patched_images, combined_patch_locations, shift_list
 
     def _random_overlay(
@@ -963,17 +963,19 @@ class AdversarialPatchPyTorch(EvasionAttack):
         return patched_images
 
     def generate(  # type: ignore
-        self, x: np.ndarray, y: np.ndarray | None = None, **kwargs
+        self, x: np.ndarray | list, y: np.ndarray | None = None, transform: torchvision.transforms | None = None, **kwargs
     ) -> tuple[np.ndarray, np.ndarray]:
         """
         Generate an adversarial patch and return the patch and its mask in arrays.
 
-        :param x: An array with the original input images of shape NCHW or input videos of shape NFCHW.
+        :param x: A numpy array with the original input images of shape NCHW or input videos of shape NFCHW.
+                  Alternatively for large datasets, a list of filepaths.
         :param y: Untargeted attack: An array with the original true labels. Targeted Attack: The target labels (boxes and classes)
         :param mask: A boolean array of shape equal to the shape of a single samples (1, H, W) or the shape of `x`
                      (N, H, W) without their channel dimensions. Any features for which the mask is True can be the
                      center location of the patch during sampling.
         :type mask: `np.ndarray`
+        :transform: If x is a list of filepaths, this is the transformation to apply to the loaded images.
         :return: An array with adversarial patch and an array of the patch mask.
         """
         import torch
@@ -1031,6 +1033,33 @@ class AdversarialPatchPyTorch(EvasionAttack):
                 )
         else:
 
+            from PIL import Image
+
+            # This class redefines Dataset to support a dataset consisting of filepaths instead of raw images
+            # this means we do not need to store the whole dataset in memory but load the images when needed
+            class FilepathDataset(torch.utils.data.Dataset):
+                def __init__(self, image_paths, y, transform=None):
+                    self.image_paths = image_paths  # list of paths to images
+                    self.y = y  # corresponding labels
+                    self.transform = transform
+
+                def __len__(self):
+                    return len(self.image_paths)
+
+                def __getitem__(self, idx):
+                    image = Image.open(self.image_paths[idx])
+
+                    if self.transform:
+                        image = self.transform(image)
+                    image = image.numpy()
+
+                    target = {}
+                    target["boxes"] = torch.from_numpy(self.y[idx]["boxes"])
+                    target["labels"] = torch.from_numpy(self.y[idx]["labels"])
+                    target["scores"] = torch.from_numpy(self.y[idx]["scores"])
+
+                    return image, target
+
             class ObjectDetectionDataset(torch.utils.data.Dataset):
                 """
                 Object detection dataset in PyTorch.
@@ -1077,9 +1106,13 @@ class AdversarialPatchPyTorch(EvasionAttack):
 
                     return img, target, mask_i
 
-            dataset_object_detection: ObjectDetectionDataset | ObjectDetectionDatasetMask
+            dataset_object_detection: ObjectDetectionDataset | ObjectDetectionDatasetMask | FilepathDataset
             if mask is None:
-                dataset_object_detection = ObjectDetectionDataset(x, y)
+                if type(x) is np.ndarray:  # Images are provided as a np.array
+                    dataset_object_detection = ObjectDetectionDataset(x, y)
+                else:  # Images are provided as a list of filepaths
+                    dataset_object_detection = FilepathDataset(x, y, transform)
+
             else:
                 dataset_object_detection = ObjectDetectionDatasetMask(
                     x, y, mask)
