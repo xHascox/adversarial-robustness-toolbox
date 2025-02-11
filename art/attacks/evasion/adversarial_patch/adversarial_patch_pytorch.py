@@ -31,6 +31,8 @@ import torchvision
 
 import numpy as np
 from tqdm.auto import trange
+from tqdm import tqdm
+import torchtnt
 
 from art.attacks.attack import EvasionAttack
 from art.attacks.evasion.adversarial_patch.utils import insert_transformed_patch
@@ -135,10 +137,10 @@ class AdversarialPatchPyTorch(EvasionAttack):
         :param verbose: Show progress bars.
         :pretrained_patch: A pretrained patch to continue training, or a target image to apply disturbance to
         :contrast_min: between 0 and contrast_max, 0 reduces all contrast of the patch
-        :contrast_max: should probably be 1 
+        :contrast_max: should probably be 1
         :disguise: What the patch should look like
         :disguise_distance_factor: factor/weight of the disguise distance
-        :split: Collusion attack, splits the patch into two 
+        :split: Collusion attack, splits the patch into two
         :gap_size: The gap size when using a collusion attack (2 patchces)
         """
         import torch
@@ -666,7 +668,12 @@ class AdversarialPatchPyTorch(EvasionAttack):
         # plt.imshow(image_mask[0].cpu().permute(1, 2, 0))
         # plt.show()
         # print(torch.sum(image_mask != 0.).item())
-        # print((images * inverted_mask).shape,
+        #######
+        # print("--->", images.shape)
+        # print("--->", inverted_mask.shape)
+        # print("--->", padded_patch.shape)
+        # print("--->", image_mask.shape)
+        # print("-->", (images * inverted_mask).shape,
         #      (padded_patch * image_mask).shape)
         patched_images = images * inverted_mask + padded_patch * image_mask
 
@@ -1051,7 +1058,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
 
                     if self.transform:
                         image = self.transform(image)
-                    image = image.numpy()
+                    image = torch.from_numpy(np.array(image)*255)
 
                     target = {}
                     target["boxes"] = torch.from_numpy(self.y[idx]["boxes"])
@@ -1125,10 +1132,12 @@ class AdversarialPatchPyTorch(EvasionAttack):
             )
 
         training_loss = []
-        for i_iter in trange(self.max_iter, desc="Adversarial Patch PyTorch", disable=not self.verbose):
+        # for i_iter in trange(self.max_iter, desc="Adversarial Patch PyTorch - Epochs", disable=not self.verbose):
+        for i_iter in range(self.max_iter):
             if mask is None:
                 loss_epoch = []
-                for images, target in data_loader:
+                for images, target in tqdm(data_loader, desc=f"Training Steps in Epoch {i_iter}/{self.max_iter}"):
+                    # for images, target in torchtnt.utils.tqdm.create_progress_bar(data_loader, desc=f"Training Steps max {self.max_iter} Epochs", num_epochs_completed=i_iter):
                     images = images.to(self.estimator.device)
                     if isinstance(target, torch.Tensor):
                         target = target.to(self.estimator.device)
