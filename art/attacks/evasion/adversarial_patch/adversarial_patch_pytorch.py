@@ -64,7 +64,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         "scale_max",
         "distortion_scale_max",
         "learning_rate",
-        "max_iter",
+        "max_epochs",
         "batch_size",
         "patch_shape",
         "optimizer",
@@ -88,7 +88,8 @@ class AdversarialPatchPyTorch(EvasionAttack):
         scale_max: float = 1.0,
         distortion_scale_max: float = 0.0,
         learning_rate: float = 5.0,
-        max_iter: int = 500,
+        max_epochs: int = 5,
+        max_steps: int = 500,
         batch_size: int = 16,
         patch_shape: tuple[int, int, int] = (3, 224, 224),
         patch_location: tuple[int, int] | None = None,
@@ -119,7 +120,8 @@ class AdversarialPatchPyTorch(EvasionAttack):
                distortion_scale_max=0.0 the perspective transformation sampling will be disabled.
         :param learning_rate: The learning rate of the optimization. For `optimizer="pgd"` the learning rate gets
                               multiplied with the sign of the loss gradients.
-        :param max_iter: The number of optimization steps.
+        :param max_epochs: The max number of optimization epochs.
+        :param max_steps: The max number of optimization steps.
         :param batch_size: The size of the training batch.
         :param patch_shape: The shape of the adversarial patch as a tuple of shape CHW (nb_channels, height, width).
         :param patch_location: The location of the adversarial patch as a tuple of shape (upper left x, upper left y).
@@ -163,7 +165,8 @@ class AdversarialPatchPyTorch(EvasionAttack):
         self.scale_max = scale_max
         self.distortion_scale_max = distortion_scale_max
         self.learning_rate = learning_rate
-        self.max_iter = max_iter
+        self.max_epochs = max_epochs
+        self.max_steps = max_steps
         self.batch_size = batch_size
         self.patch_shape = patch_shape
         self.patch_location = patch_location
@@ -1132,12 +1135,18 @@ class AdversarialPatchPyTorch(EvasionAttack):
             )
 
         training_loss = []
-        # for i_iter in trange(self.max_iter, desc="Adversarial Patch PyTorch - Epochs", disable=not self.verbose):
-        for i_iter in range(self.max_iter):
+        i_step = 0
+        # for i_iter in trange(self.max_epochs, desc="Adversarial Patch PyTorch - Epochs", disable=not self.verbose):
+        for i_iter in range(self.max_epochs):
+            if i_step >= self.max_steps:
+                break
             if mask is None:
                 loss_epoch = []
-                for images, target in tqdm(data_loader, desc=f"Training Steps in Epoch {i_iter}/{self.max_iter}"):
-                    # for images, target in torchtnt.utils.tqdm.create_progress_bar(data_loader, desc=f"Training Steps max {self.max_iter} Epochs", num_epochs_completed=i_iter):
+
+                for images, target in tqdm(data_loader, desc=f"Training Steps in Epoch {i_iter}/{self.max_epochs}"):
+                    # for images, target in torchtnt.utils.tqdm.create_progress_bar(data_loader, desc=f"Training Steps max {self.max_epochs} Epochs", num_epochs_completed=i_iter):
+                    if i_step >= self.max_steps:
+                        break
                     images = images.to(self.estimator.device)
                     if isinstance(target, torch.Tensor):
                         target = target.to(self.estimator.device)
@@ -1157,6 +1166,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
                     # print("-----")
                     # print(loss_train_batch.item())
                     loss_epoch.append(loss_train_batch.item())
+                    i_step = i_step + 1
 
             else:
                 for images, target, mask_i in data_loader:
