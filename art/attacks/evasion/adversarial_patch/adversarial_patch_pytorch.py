@@ -121,7 +121,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         :param learning_rate: The learning rate of the optimization. For `optimizer="pgd"` the learning rate gets
                               multiplied with the sign of the loss gradients.
         :param max_epochs: The max number of optimization epochs.
-        :param max_steps: The max number of optimization steps.
+        :param max_steps: The max number of optimization steps. Set to zero for no limit.
         :param batch_size: The size of the training batch.
         :param patch_shape: The shape of the adversarial patch as a tuple of shape CHW (nb_channels, height, width).
         :param patch_location: The location of the adversarial patch as a tuple of shape (upper left x, upper left y).
@@ -1138,14 +1138,14 @@ class AdversarialPatchPyTorch(EvasionAttack):
         i_step = 0
         # for i_iter in trange(self.max_epochs, desc="Adversarial Patch PyTorch - Epochs", disable=not self.verbose):
         for i_iter in range(self.max_epochs):
-            if i_step >= self.max_steps:
+            if self.max_steps and i_step >= self.max_steps:
                 break
             if mask is None:
                 loss_epoch = []
 
                 for images, target in tqdm(data_loader, desc=f"Training Steps in Epoch {i_iter}/{self.max_epochs}"):
                     # for images, target in torchtnt.utils.tqdm.create_progress_bar(data_loader, desc=f"Training Steps max {self.max_epochs} Epochs", num_epochs_completed=i_iter):
-                    if i_step >= self.max_steps:
+                    if self.max_steps and i_step >= self.max_steps:
                         break
                     images = images.to(self.estimator.device)
                     if isinstance(target, torch.Tensor):
