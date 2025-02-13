@@ -178,7 +178,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         self.pretrained_patch = pretrained_patch
         self.contrast_min = contrast_min
         self.contrast_max = contrast_max
-        if self.disguise != None:
+        if disguise != None:
             self.disguise = torch.tensor(disguise.astype(
                 np.float32), requires_grad=True).to(self.estimator.device)
         self.disguise_distance_factor = disguise_distance_factor
