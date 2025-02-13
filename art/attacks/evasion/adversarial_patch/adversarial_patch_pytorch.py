@@ -1145,8 +1145,12 @@ class AdversarialPatchPyTorch(EvasionAttack):
                 break
             if mask is None:
                 loss_epoch = []
+                prev_loss = sum(
+                    training_loss[-1]) if training_loss else 'undefined'
+                prev_loss = prev_loss * \
+                    (-1) if (self._optimizer_string == "pgd") else prev_loss
 
-                for images, target in tqdm(data_loader, desc=f"Training Steps in Epoch {i_iter}/{self.max_epochs}. Previous Loss: {training_loss[-1] if training_loss else 'undefined'}"):
+                for images, target in tqdm(data_loader, desc=f"Training Steps in Epoch {i_iter}/{self.max_epochs}. Previous Loss: {prev_loss}"):
                     # for images, target in torchtnt.utils.tqdm.create_progress_bar(data_loader, desc=f"Training Steps max {self.max_epochs} Epochs", num_epochs_completed=i_iter):
                     if self.max_steps and i_step >= self.max_steps:
                         break
