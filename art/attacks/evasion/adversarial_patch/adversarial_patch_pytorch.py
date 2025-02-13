@@ -181,6 +181,8 @@ class AdversarialPatchPyTorch(EvasionAttack):
         if disguise != None:
             self.disguise = torch.tensor(disguise.astype(
                 np.float32), requires_grad=True).to(self.estimator.device)
+        else:
+            self.disguise = None
         self.disguise_distance_factor = disguise_distance_factor
         self.split = split
         self.gap_size = gap_size
