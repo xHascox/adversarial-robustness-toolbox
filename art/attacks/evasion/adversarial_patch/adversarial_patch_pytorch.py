@@ -178,7 +178,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         self.pretrained_patch = pretrained_patch
         self.contrast_min = contrast_min
         self.contrast_max = contrast_max
-        if disguise != None:
+        if type(disguise) != type(None):
             self.disguise = torch.tensor(disguise.astype(
                 np.float32), requires_grad=True).to(self.estimator.device)
         else:
@@ -417,7 +417,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
             size=(smallest_image_edge, smallest_image_edge),
             interpolation=2,
         )
-
+        #print("mask1", image_mask.shape)
         # print("mask", self.image_shape[self.i_h],
         #      image_mask.shape[self.i_h_patch + 1])
         pad_h_before = int(
@@ -429,14 +429,16 @@ class AdversarialPatchPyTorch(EvasionAttack):
             (self.image_shape[self.i_w] - image_mask.shape[self.i_w_patch + 1]) / 2)
         pad_w_after = int(
             self.image_shape[self.i_w] - pad_w_before - image_mask.shape[self.i_w_patch + 1])
-
+        #print("pad", [pad_w_before, pad_h_before, pad_w_after, pad_h_after])
+        #print(self.image_shape[self.i_h], self.image_shape[self.i_w])
+        #print(image_mask.shape[self.i_h_patch + 1], image_mask.shape[self.i_w_patch + 1])
         image_mask = torchvision.transforms.functional.pad(
             img=image_mask,
             padding=[pad_w_before, pad_h_before, pad_w_after, pad_h_after],
             fill=0,
             padding_mode="constant",
         )
-
+        #print("mask2", image_mask.shape)
         if self.nb_dims == 4:
             image_mask = torch.unsqueeze(image_mask, dim=1)
             image_mask = torch.repeat_interleave(
@@ -675,10 +677,10 @@ class AdversarialPatchPyTorch(EvasionAttack):
         # plt.show()
         # print(torch.sum(image_mask != 0.).item())
         #######
-        # print("--->", images.shape)
-        # print("--->", inverted_mask.shape)
-        # print("--->", padded_patch.shape)
-        # print("--->", image_mask.shape)
+        #print("--->", images.shape)
+        #print("--->", inverted_mask.shape)
+        #print("--->", padded_patch.shape)
+        #print("--->", image_mask.shape)
         # print("-->", (images * inverted_mask).shape,
         #      (padded_patch * image_mask).shape)
         patched_images = images * inverted_mask + padded_patch * image_mask
