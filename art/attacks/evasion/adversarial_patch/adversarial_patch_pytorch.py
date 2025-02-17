@@ -89,7 +89,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         distortion_scale_max: float = 0.0,
         learning_rate: float = 5.0,
         max_epochs: int = 5,
-        max_steps: int = 500,
+        max_steps: int = 0,
         batch_size: int = 16,
         patch_shape: tuple[int, int, int] = (3, 224, 224),
         patch_location: tuple[int, int] | None = None,
@@ -341,6 +341,14 @@ class AdversarialPatchPyTorch(EvasionAttack):
             # print(type(target))
             # print(target)
 
+            # print("########")
+            # for t in syn_targets:
+            #    print(t)
+            # import matplotlib.pyplot as plt
+
+            # plt.imshow(
+            #    (patched_input[0].cpu().detach().numpy().transpose(1, 2, 0).astype(np.uint8)))
+
             loss = self.estimator.compute_loss(x=patched_input, y=syn_targets)
             # loss = self.estimator.compute_loss(x=patched_input, y=target)
 
@@ -417,7 +425,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
             size=(smallest_image_edge, smallest_image_edge),
             interpolation=2,
         )
-        #print("mask1", image_mask.shape)
+        # print("mask1", image_mask.shape)
         # print("mask", self.image_shape[self.i_h],
         #      image_mask.shape[self.i_h_patch + 1])
         pad_h_before = int(
@@ -429,16 +437,16 @@ class AdversarialPatchPyTorch(EvasionAttack):
             (self.image_shape[self.i_w] - image_mask.shape[self.i_w_patch + 1]) / 2)
         pad_w_after = int(
             self.image_shape[self.i_w] - pad_w_before - image_mask.shape[self.i_w_patch + 1])
-        #print("pad", [pad_w_before, pad_h_before, pad_w_after, pad_h_after])
-        #print(self.image_shape[self.i_h], self.image_shape[self.i_w])
-        #print(image_mask.shape[self.i_h_patch + 1], image_mask.shape[self.i_w_patch + 1])
+        # print("pad", [pad_w_before, pad_h_before, pad_w_after, pad_h_after])
+        # print(self.image_shape[self.i_h], self.image_shape[self.i_w])
+        # print(image_mask.shape[self.i_h_patch + 1], image_mask.shape[self.i_w_patch + 1])
         image_mask = torchvision.transforms.functional.pad(
             img=image_mask,
             padding=[pad_w_before, pad_h_before, pad_w_after, pad_h_after],
             fill=0,
             padding_mode="constant",
         )
-        #print("mask2", image_mask.shape)
+        # print("mask2", image_mask.shape)
         if self.nb_dims == 4:
             image_mask = torch.unsqueeze(image_mask, dim=1)
             image_mask = torch.repeat_interleave(
@@ -677,10 +685,10 @@ class AdversarialPatchPyTorch(EvasionAttack):
         # plt.show()
         # print(torch.sum(image_mask != 0.).item())
         #######
-        #print("--->", images.shape)
-        #print("--->", inverted_mask.shape)
-        #print("--->", padded_patch.shape)
-        #print("--->", image_mask.shape)
+        # print("--->", images.shape)
+        # print("--->", inverted_mask.shape)
+        # print("--->", padded_patch.shape)
+        # print("--->", image_mask.shape)
         # print("-->", (images * inverted_mask).shape,
         #      (padded_patch * image_mask).shape)
         patched_images = images * inverted_mask + padded_patch * image_mask
