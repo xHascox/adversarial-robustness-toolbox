@@ -278,6 +278,11 @@ class AdversarialPatchPyTorch(EvasionAttack):
     def _loss(self, images: "torch.Tensor", target: "torch.Tensor", mask: "torch.Tensor" | None) -> "torch.Tensor":
         import torch
 
+        if (not self.targeted and self._optimizer_string != "pgd") or self.targeted and self._optimizer_string == "pgd":
+            change_sign = True
+        else:
+            change_sign = False
+
         if isinstance(target, torch.Tensor):
 
             predictions, target = self._predictions(images, mask, target)
@@ -354,9 +359,12 @@ class AdversarialPatchPyTorch(EvasionAttack):
 
             # TODO add distance to disguise to Loss # TODO require gradients?
             if type(self.disguise) != type(None):
-                loss += self.disguise_distance_factor * torch.dist(self._patch, self.disguise)
-
-        if (not self.targeted and self._optimizer_string != "pgd") or self.targeted and self._optimizer_string == "pgd":
+                if change_sign:
+                    loss -= self.disguise_distance_factor * torch.dist(self._patch, self.disguise)
+                else:
+                    loss += self.disguise_distance_factor * torch.dist(self._patch, self.disguise)
+        
+        if change_sign:
             loss = -loss
 
         return loss
