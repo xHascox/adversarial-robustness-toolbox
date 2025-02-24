@@ -354,8 +354,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
 
             # TODO add distance to disguise to Loss # TODO require gradients?
             if type(self.disguise) != type(None):
-                loss += self.disguise_distance_factor * torch.sqrt(torch.sum((self.disguise -
-                                                                              self._patch) ** 2))
+                loss += self.disguise_distance_factor * torch.dist(self._patch, self.disguise)
 
         if (not self.targeted and self._optimizer_string != "pgd") or self.targeted and self._optimizer_string == "pgd":
             loss = -loss
