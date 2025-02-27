@@ -296,6 +296,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
                 loss = torch.nn.functional.nll_loss(
                     input=predictions, target=torch.argmax(target, dim=1), reduction="mean"
                 )
+            self.detailed_loss_history["classification"] += [loss.item()]
 
         else:
             patched_input, patch_location_list, _ = self._random_overlay_get_patch_location_split(
@@ -357,8 +358,6 @@ class AdversarialPatchPyTorch(EvasionAttack):
 
             loss = self.estimator.compute_loss(x=patched_input, y=syn_targets)
             # loss = self.estimator.compute_loss(x=patched_input, y=target)
-
-            # TODO return separate losses
             self.detailed_loss_history["classification"] += [loss.item()]
             
             if type(self.disguise) != type(None):
@@ -368,8 +367,6 @@ class AdversarialPatchPyTorch(EvasionAttack):
 
         if change_sign:
             loss = -loss
-
-        
 
         return loss
 
