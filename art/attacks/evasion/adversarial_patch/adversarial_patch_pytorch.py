@@ -184,6 +184,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         else:
             self.disguise = None
         self.disguise_distance_factor = disguise_distance_factor
+        self.detailed_loss_history = {"classification":[], "disguise":[]}
         self.split = split
         self.gap_size = gap_size
         self._check_params()
@@ -357,15 +358,18 @@ class AdversarialPatchPyTorch(EvasionAttack):
             loss = self.estimator.compute_loss(x=patched_input, y=syn_targets)
             # loss = self.estimator.compute_loss(x=patched_input, y=target)
 
-            # TODO add distance to disguise to Loss # TODO require gradients?
+            # TODO return separate losses
+            self.detailed_loss_history["classification"] += [loss.item()]
+            
             if type(self.disguise) != type(None):
-                if change_sign:
-                    loss -= self.disguise_distance_factor * torch.dist(self._patch, self.disguise)
-                else:
-                    loss += self.disguise_distance_factor * torch.dist(self._patch, self.disguise)
-        
+                disguise_loss = torch.dist(self._patch, self.disguise)
+                self.detailed_loss_history["disguise"] += [disguise_loss.item()]
+                loss += self.disguise_distance_factor * disguise_loss
+
         if change_sign:
             loss = -loss
+
+        
 
         return loss
 
