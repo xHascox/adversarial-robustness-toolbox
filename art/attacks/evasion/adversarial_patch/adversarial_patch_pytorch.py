@@ -257,9 +257,6 @@ class AdversarialPatchPyTorch(EvasionAttack):
                     self._patch, min=self.estimator.clip_values[0], max=self.estimator.clip_values[1]
                 )
 
-        print("DYONYSIS")
-        print(torch.cuda.memory_summary(device=torch.cuda.current_device()))
-
         return loss.item() # NOTE doing item here saves a lot of (peak) VRAM
 
     def _predictions(
@@ -339,7 +336,6 @@ class AdversarialPatchPyTorch(EvasionAttack):
                                'labels': np.array(labels)}
                 syn_targets.append(synthetic_y)
                 print("loss iteration in batch", i)
-                print(torch.cuda.memory_summary(device=torch.cuda.current_device()))
 
                 """patch_location = patch_location_list[i]
                 # print(patch_location)
@@ -352,8 +348,6 @@ class AdversarialPatchPyTorch(EvasionAttack):
             # print(patched_input.shape)
             # print(type(target))
             # print(target)
-            print("ATHENE")
-            print(torch.cuda.memory_summary(device=torch.cuda.current_device()))
             # print("########")
             # for t in syn_targets:
             #    print(t)
@@ -364,13 +358,8 @@ class AdversarialPatchPyTorch(EvasionAttack):
 
             loss = self.estimator.compute_loss(x=patched_input, y=syn_targets)
             # loss = self.estimator.compute_loss(x=patched_input, y=target)
-            print("HYDRA1")
-            print(torch.cuda.memory_summary(device=torch.cuda.current_device()))
             self.detailed_loss_history["classification"] += [loss.item()]
 
-            print("HYDRA2")
-            print(torch.cuda.memory_summary(device=torch.cuda.current_device()))
-            
             if type(self.disguise) != type(None):
                 disguise_loss = torch.dist(self._patch, self.disguise)
                 self.detailed_loss_history["disguise"] += [disguise_loss.item()]
@@ -380,8 +369,6 @@ class AdversarialPatchPyTorch(EvasionAttack):
             loss = -loss
 
 
-        print("HYDRA3")
-        print(torch.cuda.memory_summary(device=torch.cuda.current_device()))
         
         return loss
 
@@ -458,8 +445,6 @@ class AdversarialPatchPyTorch(EvasionAttack):
         """
         import torch
         import torchvision
-        print("########## \n MEMORY \n")
-        print(torch.cuda.memory_summary(device=torch.cuda.current_device()))
         print("3___")
         print(">>>_random_overlay_get_patch_location", self.patch_locations)
         print("scale", scale)
@@ -557,7 +542,6 @@ class AdversarialPatchPyTorch(EvasionAttack):
         for i_sample in range(nb_samples):
             self.patch_location = static_patch_location # reset every iteration so we have not leftovers frfom last iterations in patch_location
             print(f"START {i_sample} {half_to_keep} for loop with ", self.patch_location)
-            print(torch.cuda.memory_summary(device=torch.cuda.current_device()))
             if self.patch_location is None and not self.patch_locations:
                 # CASE: Randomly placed and (randomly) scaled patch
                 print("A")
@@ -840,8 +824,6 @@ class AdversarialPatchPyTorch(EvasionAttack):
         # plt.show()
         # print(torch.sum(image_mask != 0.).item())
         #######
-        print("########## \n MEMORY JUPITER\n")
-        print(torch.cuda.memory_summary(device=torch.cuda.current_device()))
         # print("--->", images.shape)
         # print("--->", inverted_mask.shape)
         # print("--->", padded_patch.shape)
@@ -1320,9 +1302,6 @@ class AdversarialPatchPyTorch(EvasionAttack):
         # for i_iter in trange(self.max_epochs, desc="Adversarial Patch PyTorch - Epochs", disable=not self.verbose):
         for i_iter in range(self.max_epochs):
 
-            print("########## \n MEMORY \n")
-            print(torch.cuda.memory_summary(device=torch.cuda.current_device()))
-
             if self.max_steps and i_step >= self.max_steps:
                 break
             if mask is None:
@@ -1379,8 +1358,6 @@ class AdversarialPatchPyTorch(EvasionAttack):
 
             training_loss.append(loss_epoch)
 
-            print("########## \n MEMORY \n")
-            print(torch.cuda.memory_summary(device=torch.cuda.current_device()))
 
             # Write summary
             if self.summary_writer is not None:  # pragma: no cover
