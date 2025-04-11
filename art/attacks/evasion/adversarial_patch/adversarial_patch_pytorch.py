@@ -1448,20 +1448,45 @@ class AdversarialPatchPyTorch(EvasionAttack):
         else:
             patch_tensor = self._patch
 
-        if split:
-            patched_images, locations, shifts = self._random_overlay_get_patch_location_split(
-                images=x_tensor, patch=patch_tensor, scale=scale, mask=mask_tensor, split=split, split_keep_both=split_keep_both, half_to_keep=half_to_keep, patch_location=patch_location)
-            if return_patch_outlines:
-                return patched_images.detach().cpu().numpy(), locations
-            return patched_images.detach().cpu().numpy()
 
-        return (
-            self._random_overlay(
-                images=x_tensor, patch=patch_tensor, scale=scale, mask=mask_tensor)
-            .detach()
-            .cpu()
-            .numpy()
-        )
+        # BATCHED VARIANT
+        all_patched_images = np.array([])
+        all_locations = np.array([])
+        all_shifts = np.array([])
+        batch_size = 2
+        for i in range(0, len(x), batch_size):
+            self.patch_locations = patch_locations[i:i+batch_size]
+            patched_images, locations, shifts = self._random_overlay_get_patch_location_split(
+                images=x_tensor[i:i+batch_size], patch=patch_tensor, scale=scale, mask=mask_tensor[i:i+batch_size] if mask else None, split=split, 
+                split_keep_both=split_keep_both, half_to_keep=half_to_keep, patch_location=patch_location)
+            if i == 0:
+                all_patched_images = patched_images.detach().cpu().numpy()
+                all_locations = locations
+                all_shifts = shifts
+            else:
+                all_patched_images = np.concatenate((all_patched_images, patched_images.detach().cpu().numpy()))
+                all_locations = np.concatenate((all_locations, locations))
+                all_shifts = np.concatenate((all_shifts, shifts))
+        if return_patch_outlines:
+            return all_patched_images, locations
+        return all_patched_images
+        ### </>
+
+
+        #if split:
+        patched_images, locations, shifts = self._random_overlay_get_patch_location_split(
+            images=x_tensor, patch=patch_tensor, scale=scale, mask=mask_tensor, split=split, split_keep_both=split_keep_both, half_to_keep=half_to_keep, patch_location=patch_location)
+        if return_patch_outlines:
+            return patched_images.detach().cpu().numpy(), locations
+        return patched_images.detach().cpu().numpy()
+
+        #return (
+        #    self._random_overlay(
+        #        images=x_tensor, patch=patch_tensor, scale=scale, mask=mask_tensor)
+        #    .detach()
+        #    .cpu()
+        #    .numpy()
+        #)
 
     def reset_patch(self, initial_patch_value: float | np.ndarray | None = None) -> None:
         """
