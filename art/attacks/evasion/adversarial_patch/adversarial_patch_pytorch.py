@@ -301,8 +301,9 @@ class AdversarialPatchPyTorch(EvasionAttack):
             self.detailed_loss_history["classification"] += [loss.item()]
 
         else:
+            if DEBUG: print("!!! split is", self.split, "in _loss")
             patched_input, patch_location_list, _ = self._random_overlay_get_patch_location_split(
-                images, self._patch, mask=mask)  # TODO create new targets
+                images, self._patch, mask=mask, split=self.split)  # TODO create new targets
             patched_input = torch.clamp(
                 patched_input,
                 min=self.estimator.clip_values[0],
@@ -615,6 +616,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
 
             if mask is None:
                 if self.patch_location is None and not prev_patches and (not self.patch_locations or self.patch_locations and not any(self.patch_locations[i_sample])):
+                    if DEBUG: print("X")
                     if leave_margin_right:
                         padding_after_scaling_h = (
                             self.image_shape[self.i_h] - im_scale *
@@ -639,6 +641,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
                     y_shift = np.random.uniform(-padding_after_scaling_h,
                                                 padding_after_scaling_h)
                 elif self.patch_location is None and prev_patches:
+                    if DEBUG: print("Y")
                     padding_h = int(math.floor(
                         self.image_shape[self.i_h] - self.patch_shape[self.i_h]) / 2.0)
                     padding_w = int(math.floor(
@@ -658,6 +661,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
                     y_shift = prev_shift_list[i_sample][1]
                 elif not split and self.patch_locations and any(self.patch_locations[i_sample]):
                     if DEBUG: print("4___")
+                    if DEBUG: print("Z")
                     padding_h = int(math.floor(
                         self.image_shape[self.i_h] - self.patch_shape[self.i_h]) / 2.0)
                     padding_w = int(math.floor(
@@ -670,6 +674,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
                     if DEBUG: print(f"tar loc: {self.patch_locations[i_sample][1][0][0][0]} {self.patch_locations[i_sample][1][0][0][1]}")
                     if DEBUG: print(f"shifts: {x_shift} {y_shift}")
                 elif split:
+                    if DEBUG: print("R")
                     padding_h = int(math.floor(
                         self.image_shape[self.i_h] - self.patch_shape[self.i_h]) / 2.0)
                     padding_w = int(math.floor(
@@ -688,6 +693,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
                     if DEBUG: print("___ split :) ==", self.patch_location, self.patch_location)
                     if DEBUG: print(f"self.patch_location {self.patch_location[0]} {self.patch_location[1]}")
                 else:
+                    if DEBUG: print("K")
                     padding_h = int(math.floor(
                         self.image_shape[self.i_h] - self.patch_shape[self.i_h]) / 2.0)
                     padding_w = int(math.floor(
@@ -868,7 +874,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         left_half = patch[:, :, :width_split]
         right_half = patch[:, :, width_split:]
         # print(left_half.shape, right_half.shape)
-
+        if DEBUG: print("_random_overlay_get_patch_location_split split is", split)
         # import matplotlib.pyplot as plt
         # plt.imshow(images[0].cpu().detach().permute(1, 2, 0)/255)
         # plt.show()
