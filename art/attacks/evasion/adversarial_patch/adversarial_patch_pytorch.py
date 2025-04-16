@@ -788,6 +788,41 @@ class AdversarialPatchPyTorch(EvasionAttack):
                 img=padded_patch_i, startpoints=startpoints, endpoints=endpoints, interpolation=2, fill=None
             )
 
+            # Recursive Bilinear Scaling
+            # Without this, training large patches (>256px) with very small im_scale (<0.03) does not work well, as
+            # Bilinear Interpolation only bases each final pixel on 2 original pixels, so we might not train a lot of pixels
+            def apply_affine_transform(padded_patch_i, phi_rotate=0, x_shift=0, y_shift=0, im_scale=1, interpolation=2):
+                padded_patch_i = torchvision.transforms.functional.affine(
+                    img=padded_patch_i,
+                    angle=phi_rotate,
+                    translate=[x_shift, y_shift],
+                    scale=im_scale,
+                    shear=[0, 0],
+                    interpolation=interpolation,
+                    fill=None,
+                )
+                
+                return padded_patch_i
+
+            def recursive_affine_scaling(padded_patch_i, im_scale, interpolation=2):
+                if im_scale < 0.5 and True:
+                    # Recursive Case: Scale by 0.5 and recurse with new im_scale = im_scale / 0.5
+                    padded_patch_i = apply_affine_transform(padded_patch_i, im_scale=0.5, interpolation=interpolation)
+                    return recursive_affine_scaling(padded_patch_i, im_scale / 0.5, interpolation)
+                else:
+                    # Base Case: if im_scale is greater than or equal to 0.5, apply the transformation once,
+                    # Since Bilinear Interpolation does not lose any pixels in these scalings
+                    return apply_affine_transform(padded_patch_i, im_scale=im_scale, interpolation=interpolation)
+         
+            padded_patch_i = recursive_affine_scaling(
+                padded_patch_i=padded_patch_i,
+                im_scale = im_scale,
+                interpolation=interpolation, # Typically `InterpolationMode.BILINEAR` in PyTorch 1.10+
+            )
+            padded_patch_i = apply_affine_transform(padded_patch_i, phi_rotate, x_shift, y_shift, 1, interpolation)
+
+            # Previous Version:
+            """
             padded_patch_i = torchvision.transforms.functional.affine(
                 img=padded_patch_i,
                 angle=phi_rotate,
@@ -796,7 +831,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
                 shear=[0, 0],
                 interpolation=interpolation,  # NEAREST or BILINEAR
                 fill=None,
-            )
+            )"""
 
             # calculate the patch location:
             # Calculate the top-left corner of the patch (approximated)
