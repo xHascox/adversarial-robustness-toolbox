@@ -1205,7 +1205,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
 
         if decay_rate:
             self.decay_rate = decay_rate
-        if decay_step
+        if decay_step:
             self.decay_step = decay_step
 
         shuffle = kwargs.get("shuffle", True)
