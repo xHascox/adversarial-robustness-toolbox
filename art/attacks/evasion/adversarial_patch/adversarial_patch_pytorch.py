@@ -234,8 +234,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         if self._optimizer_string == "Adam":
             self._optimizer = torch.optim.Adam(
                 [self._patch], lr=self.learning_rate)
-        
-        self.scheduler = torch.optim.lr_scheduler.StepLR(self._optimizer, step_size=self.decay_step, gamma=self.decay_rate)
+            self.scheduler = torch.optim.lr_scheduler.StepLR(self._optimizer, step_size=self.decay_step, gamma=self.decay_rate)
 
     def _train_step(
         self, images: "torch.Tensor", target: "torch.Tensor", mask: "torch.Tensor" | None = None
@@ -942,6 +941,11 @@ class AdversarialPatchPyTorch(EvasionAttack):
 
             combined_patch_locations = [(left[0], right[1], right[2], right[3]) for left, right in zip(
                 patch_location_list_left, patch_location_list_right)]  # This returns one box, over both patches and the gap between them
+            # TODO NOTE maybe the following works with pedestrian locations?
+            combined_patch_locations = [(left[0], left[1], right[2], right[3]) for left, right in zip(
+                patch_location_list_left, patch_location_list_right)]
+            combined_patch_locations = [(left[0], min(left[1], right[1]), max(right[2], left[2]), max(right[3], left[3])) for left, right in zip(
+                patch_location_list_left, patch_location_list_right)]
         else:
             combined_patch_locations = patch_location_list_left
 
@@ -1420,9 +1424,11 @@ class AdversarialPatchPyTorch(EvasionAttack):
 
             training_loss.append(loss_epoch)
 
-            self.scheduler.step()
-            current_lr = self._optimizer.param_groups[0]['lr']
-            print(f"Epoch {i_iter + 1}: Learning Rate = {current_lr}")
+            
+            if self._optimizer_string == "Adam": 
+                self.scheduler.step()
+                current_lr = self._optimizer.param_groups[0]['lr']
+                print(f"Epoch {i_iter + 1}: Learning Rate = {current_lr}")
 
             # Write summary
             if self.summary_writer is not None:  # pragma: no cover
@@ -1533,7 +1539,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
                 all_locations = np.concatenate((all_locations, locations))
                 all_shifts = np.concatenate((all_shifts, shifts))
         if return_patch_outlines:
-            return all_patched_images, locations
+            return all_patched_images, all_locations
         return all_patched_images
         ### </>
 
