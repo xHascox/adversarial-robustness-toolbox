@@ -1211,6 +1211,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
             self.decay_rate = decay_rate
         if decay_step:
             self.decay_step = decay_step
+        self.scheduler = torch.optim.lr_scheduler.StepLR(self._optimizer, step_size=self.decay_step, gamma=self.decay_rate)
 
         shuffle = kwargs.get("shuffle", True)
         mask = kwargs.get("mask")
