@@ -1425,10 +1425,11 @@ class AdversarialPatchPyTorch(EvasionAttack):
             training_loss.append(loss_epoch)
 
             
-            if self._optimizer_string == "Adam": 
+            if self._optimizer_string == "Adam":
+                print(f"Epoch {i_iter + 1}: Learning Rate = {self.scheduler.get_last_lr()}")
                 self.scheduler.step()
-                current_lr = self._optimizer.param_groups[0]['lr']
-                print(f"Epoch {i_iter + 1}: Learning Rate = {current_lr}")
+                #current_lr = self._optimizer.param_groups[0]['lr']
+                print(f"Epoch {i_iter + 1}: Learning Rate = {self.scheduler.get_last_lr()}")
 
             # Write summary
             if self.summary_writer is not None:  # pragma: no cover
