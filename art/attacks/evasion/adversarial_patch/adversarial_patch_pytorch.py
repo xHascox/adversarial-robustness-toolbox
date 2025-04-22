@@ -1358,6 +1358,8 @@ class AdversarialPatchPyTorch(EvasionAttack):
 
         training_loss = []
         i_step = 0
+        best_patch = None
+        best_loss = float("inf")
         # for i_iter in trange(self.max_epochs, desc="Adversarial Patch PyTorch - Epochs", disable=not self.verbose):
         for i_iter in tqdm(range(self.max_epochs), desc=f"Training Epochs"):
 
@@ -1424,7 +1426,9 @@ class AdversarialPatchPyTorch(EvasionAttack):
                         images=images, target=target, mask=mask_i)
 
             training_loss.append(loss_epoch)
-
+            if loss_epoch < best_loss:
+                best_loss = loss_epoch
+                best_patch = self._patch.detach().cpu().numpy()
             
             if self._optimizer_string == "Adam":
                 if DEBUG: print(f"Epoch {i_iter + 1}: Learning Rate = {self.scheduler.get_last_lr()}")
@@ -1458,7 +1462,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
             self.summary_writer.reset()
 
         return (
-            self._patch.detach().cpu().numpy(),
+            best_patch,
             self._get_circular_patch_mask(nb_samples=1).cpu().numpy()[0],
             training_loss,
         )
