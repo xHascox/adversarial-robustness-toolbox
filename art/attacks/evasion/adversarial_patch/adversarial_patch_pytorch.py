@@ -1359,7 +1359,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         training_loss = []
         i_step = 0
         # for i_iter in trange(self.max_epochs, desc="Adversarial Patch PyTorch - Epochs", disable=not self.verbose):
-        for i_iter in range(self.max_epochs):
+        for i_iter in tqdm(range(self.max_epochs), desc=f"Training Epochs"):
 
             if self.max_steps and i_step >= self.max_steps:
                 break
@@ -1370,7 +1370,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
                 prev_loss = prev_loss * \
                     (-1) if (self._optimizer_string == "pgd") else prev_loss
 
-                for images, target in tqdm(data_loader, desc=f"Training Steps in Epoch {i_iter+1}/{self.max_epochs}. Previous Loss: {prev_loss}"):
+                for images, target in tqdm(data_loader, desc=f"Training Steps in Epoch {i_iter+1}/{self.max_epochs}. Previous Loss: {prev_loss}", leave=True if self.max_epochs>10 else True):
                     # for images, target in torchtnt.utils.tqdm.create_progress_bar(data_loader, desc=f"Training Steps max {self.max_epochs} Epochs", num_epochs_completed=i_iter):
                     if self.max_steps and i_step >= self.max_steps:
                         break
@@ -1427,10 +1427,10 @@ class AdversarialPatchPyTorch(EvasionAttack):
 
             
             if self._optimizer_string == "Adam":
-                print(f"Epoch {i_iter + 1}: Learning Rate = {self.scheduler.get_last_lr()}")
+                if DEBUG: print(f"Epoch {i_iter + 1}: Learning Rate = {self.scheduler.get_last_lr()}")
                 self.scheduler.step()
                 #current_lr = self._optimizer.param_groups[0]['lr']
-                print(f"Epoch {i_iter + 1}: Learning Rate = {self.scheduler.get_last_lr()}")
+                if DEBUG: print(f"Epoch {i_iter + 1}: Learning Rate = {self.scheduler.get_last_lr()}")
 
             # Write summary
             if self.summary_writer is not None:  # pragma: no cover
