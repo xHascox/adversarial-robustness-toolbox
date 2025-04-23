@@ -96,6 +96,8 @@ class AdversarialPatchPyTorch(EvasionAttack):
         patch_shape: tuple[int, int, int] = (3, 224, 224),
         patch_type: str = "circle",
         optimizer: str = "Adam",
+        scheduler: str = "StepLR",
+        cycle_mult: int = 1,
         decay_rate: float = 1.0,
         decay_step: int = 1,
         targeted: bool = True,
@@ -107,8 +109,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         disguise: np.ndarray | None = None,
         disguise_distance_factor: float = 1,
         split: bool = False,
-        gap_size: int = 0,
-    ):
+        gap_size: int = 0,    ):
         """
         Create an instance of the :class:`.AdversarialPatchPyTorch`.
 
@@ -147,6 +148,10 @@ class AdversarialPatchPyTorch(EvasionAttack):
         :disguise_distance_factor: factor/weight of the disguise distance
         :split: Collusion attack, splits the patch into two
         :gap_size: The gap size when using a collusion attack (2 patchces)
+        :scheduler: CosineAnnealingWarmRestarts or StepLR: The learning rate scheduler to use. 
+        :cycle_mult: The cycle multiplier for CosineAnnealingWarmRestarts, makes subsequent cycles longer.
+        :decay_step: The step size for the learning rate scheduler. For StepLR, this is the number of epochs after which the decay is applied.
+        :decay_rate: The decay rate of the learning rate scheduler.
         """
         import torch
         import torchvision
@@ -176,6 +181,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         self.patch_type = patch_type
         self.decay_rate = decay_rate
         self.decay_step = decay_step
+        self.cycle_mult = cycle_mult
         self.image_shape = estimator.input_shape
         self.targeted = targeted
         self.verbose = verbose
@@ -231,10 +237,12 @@ class AdversarialPatchPyTorch(EvasionAttack):
                 self._initial_value, requires_grad=True, device=self.estimator.device)
 
         self._optimizer_string = optimizer
+        self._scheduler_string = scheduler
         if self._optimizer_string == "Adam":
             self._optimizer = torch.optim.Adam(
                 [self._patch], lr=self.learning_rate)
-            self.scheduler = torch.optim.lr_scheduler.StepLR(self._optimizer, step_size=self.decay_step, gamma=self.decay_rate)
+            
+
 
     def _train_step(
         self, images: "torch.Tensor", target: "torch.Tensor", mask: "torch.Tensor" | None = None
@@ -1211,7 +1219,14 @@ class AdversarialPatchPyTorch(EvasionAttack):
             self.decay_rate = decay_rate
         if decay_step:
             self.decay_step = decay_step
-        self.scheduler = torch.optim.lr_scheduler.StepLR(self._optimizer, step_size=self.decay_step, gamma=self.decay_rate)
+        if self._optimizer_string == "Adam":
+            if self._scheduler_string == "CosineAnnealingWarmRestarts":
+                self.scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(self._optimizer, 
+                                                                      T_0=self.decay_step, # First cycle lasts T_0 epochs
+                                                                      T_mult=self.cycle_mult, # Cycle length multiplier for subsequent cycles
+                )
+            else:
+                self.scheduler = torch.optim.lr_scheduler.StepLR(self._optimizer, step_size=self.decay_step, gamma=self.decay_rate)
 
         shuffle = kwargs.get("shuffle", True)
         mask = kwargs.get("mask")
@@ -1368,11 +1383,15 @@ class AdversarialPatchPyTorch(EvasionAttack):
             if mask is None:
                 loss_epoch = []
                 prev_loss = sum(
-                    training_loss[-1]) if training_loss else 'undefined'
+                    training_loss[-1]) if training_loss else float("nan")
                 prev_loss = prev_loss * \
                     (-1) if (self._optimizer_string == "pgd") else prev_loss
-
-                for images, target in tqdm(data_loader, desc=f"Training Steps in Epoch {i_iter+1}/{self.max_epochs}. Previous Loss: {prev_loss}", leave=True if self.max_epochs>10 else True):
+                #print(prev_loss)
+                #print(type(prev_loss))
+                #print(f"{prev_loss:.4f}")
+                #print(f"{self.scheduler.base_lrs[0]:.6f}")
+                #print(f"{self.scheduler.get_last_lr()[0]:.6f}")
+                for images, target in tqdm(data_loader, desc=f"Training Steps in Epoch {i_iter+1}/{self.max_epochs}. Previous Loss: {prev_loss} LR = {self.scheduler.get_last_lr()[0]:.6f} Sched BASE LR: {self.scheduler.base_lrs[0]:.6f}", leave=True if self.max_epochs>10 else True):
                     # for images, target in torchtnt.utils.tqdm.create_progress_bar(data_loader, desc=f"Training Steps max {self.max_epochs} Epochs", num_epochs_completed=i_iter):
                     if self.max_steps and i_step >= self.max_steps:
                         break
@@ -1426,12 +1445,16 @@ class AdversarialPatchPyTorch(EvasionAttack):
                         images=images, target=target, mask=mask_i)
 
             training_loss.append(loss_epoch)
-            if loss_epoch < best_loss:
-                best_loss = loss_epoch
+            if sum(loss_epoch) < best_loss:
+                best_loss = sum(loss_epoch)
                 best_patch = self._patch.detach().cpu().numpy()
             
             if self._optimizer_string == "Adam":
                 if DEBUG: print(f"Epoch {i_iter + 1}: Learning Rate = {self.scheduler.get_last_lr()}")
+                if self._scheduler_string == "CosineAnnealingWarmRestarts":
+                    if DEBUG: print("BASE LR SCHEDULER", self.scheduler.base_lrs[0])
+                    if i_iter != 0 and i_iter % self.decay_step == 0:
+                        self.scheduler.base_lrs[0] = self.scheduler.base_lrs[0] * self.decay_rate
                 self.scheduler.step()
                 #current_lr = self._optimizer.param_groups[0]['lr']
                 if DEBUG: print(f"Epoch {i_iter + 1}: Learning Rate = {self.scheduler.get_last_lr()}")
