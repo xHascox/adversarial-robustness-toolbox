@@ -141,6 +141,13 @@ class Attack(abc.ABC):
         """The estimator."""
         return self._estimator
 
+    @estimator.setter
+    def estimator(self, new_estimator):
+        """Set a new estimator, ensuring it meets the attack requirements."""
+        if not self.is_estimator_valid(new_estimator, self._estimator_requirements):
+            raise EstimatorError(self.__class__, self.estimator_requirements, new_estimator)
+        self._estimator = new_estimator
+
     @property
     def summary_writer(self):
         """The summary writer."""
