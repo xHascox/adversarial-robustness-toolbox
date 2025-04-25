@@ -109,7 +109,8 @@ class AdversarialPatchPyTorch(EvasionAttack):
         disguise: np.ndarray | None = None,
         disguise_distance_factor: float = 1,
         split: bool = False,
-        gap_size: int = 0,    ):
+        gap_size: int = 0,
+        fixed_location_random_scaling: bool | None = None,    ):
         """
         Create an instance of the :class:`.AdversarialPatchPyTorch`.
 
@@ -152,6 +153,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         :cycle_mult: The cycle multiplier for CosineAnnealingWarmRestarts, makes subsequent cycles longer.
         :decay_step: The step size for the learning rate scheduler. For StepLR, this is the number of epochs after which the decay is applied.
         :decay_rate: The decay rate of the learning rate scheduler.
+        :fixed_location_random_scaling: Use random scaling despite given location boxes (when split = True and patch_locations is set)
         """
         import torch
         import torchvision
@@ -198,6 +200,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         self.split = split
         self.gap_size = gap_size
         self.patch_locations = []
+        self.fixed_location_random_scaling = fixed_location_random_scaling
         self._check_params()
 
         self.i_h_patch = 1
@@ -454,6 +457,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         prev_shift_list: list = [],
         half_to_keep = None,
         split = False,
+        fixed_location_random_scaling = None,
     ) -> "torch.Tensor":
         """
         Apply the patch but also return its location.
@@ -597,6 +601,9 @@ class AdversarialPatchPyTorch(EvasionAttack):
                                 self.patch_location = box_left[1][0]
                                 patch_location_lower_right = box_left[1][1]
                                 im_scale = (box_left[1][1][0] - box_left[1][0][0]) / self.image_shape[self.i_w]
+                            if self.fixed_location_random_scaling:
+                                im_scale = np.random.uniform(
+                                    low=self.scale_min, high=self.scale_max)
                     else:
                         # SUBSUBCASE: We do a normal attack
                         if DEBUG: print("ATHENE setting location to ", self.patch_locations[i_sample][1][0][0])
@@ -904,6 +911,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         split: bool = False,
         half_to_keep: str | None = None,
         patch_location = None,
+        fixed_location_random_scaling = None,
     ) -> "torch.Tensor":
         """
         Split the patch into two parts, then apply first the left side and then the right sid eof the patch,
@@ -913,7 +921,8 @@ class AdversarialPatchPyTorch(EvasionAttack):
         self.patch_location = patch_location
         if not self.split and not split:
             return self._random_overlay_get_patch_location(images, patch, scale, mask)
-
+        if fixed_location_random_scaling is not None:
+            self.fixed_location_random_scaling = fixed_location_random_scaling
         # Split the patch into left and right halves
         # print(patch.shape)
         width_split = patch.shape[self.i_w] // 2
@@ -930,7 +939,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
             left_half = right_half
         # Now we apply the first half of the patch, normally left
         patched_images, patch_location_list_left, shift_list = self._random_overlay_get_patch_location(
-            images, left_half, scale, mask, leave_margin_right=True, gap_size=self.gap_size, split=split, half_to_keep=half_to_keep)
+            images, left_half, scale, mask, leave_margin_right=True, gap_size=self.gap_size, split=split, half_to_keep=half_to_keep, fixed_location_random_scaling=self.fixed_location_random_scaling)
         
         # print("left", patch_location_list_left)
 
@@ -941,7 +950,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
             self.patch_location = patch_location
             # Now we apply the second half of the patch, normally right
             patched_images, patch_location_list_right, shift_list = self._random_overlay_get_patch_location(
-                patched_images, right_half, scale, mask, prev_patches=patch_location_list_left, prev_shift_list=shift_list, gap_size=self.gap_size, split=split, half_to_keep="right")
+                patched_images, right_half, scale, mask, prev_patches=patch_location_list_left, prev_shift_list=shift_list, gap_size=self.gap_size, split=split, half_to_keep="right", fixed_location_random_scaling=self.fixed_location_random_scaling)
             # print("right", patch_location_list_right)
 
             combined_patch_locations = [[left, right] for left, right in zip(
@@ -1195,7 +1204,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         return patched_images
 
     def generate(  # type: ignore
-        self, x: np.ndarray | list, y: np.ndarray | None = None, transform: torchvision.transforms | None = None, patch_locations: list = [], patch_location: tuple[int, int] | None = None, detector_creator = None, decay_rate: float | None = None, decay_step: int | None = None, **kwargs
+        self, x: np.ndarray | list, y: np.ndarray | None = None, transform: torchvision.transforms | None = None, patch_locations: list = [], patch_location: tuple[int, int] | None = None, detector_creator = None, decay_rate: float | None = None, decay_step: int | None = None, fixed_location_random_scaling: bool | None = None, **kwargs
     ) -> tuple[np.ndarray, np.ndarray]:
         """
         Generate an adversarial patch and return the patch and its mask in arrays.
@@ -1214,6 +1223,8 @@ class AdversarialPatchPyTorch(EvasionAttack):
         print("USING DEVICE:", self.estimator.device)  # TODO REMOVE
         self.patch_location = patch_location
         self.patch_locations = patch_locations
+        if fixed_location_random_scaling:
+            self.fixed_location_random_scaling = fixed_location_random_scaling
 
         if decay_rate:
             self.decay_rate = decay_rate
@@ -1518,6 +1529,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         return_patch_outlines: bool = False,
         patch_locations: list = [],
         patch_location: tuple[int, int] | None = None,
+        fixed_location_random_scaling = None,
     ) -> np.ndarray:
         """
         A function to apply the learned adversarial patch to images or videos.
@@ -1533,6 +1545,8 @@ class AdversarialPatchPyTorch(EvasionAttack):
         import torch
         self.patch_locations = patch_locations
         self.patch_location = patch_location
+        if fixed_location_random_scaling is not None:
+            self.fixed_location_random_scaling = fixed_location_random_scaling
 
         if mask is not None:
             mask = mask.copy()
@@ -1558,7 +1572,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
             self.patch_locations = patch_locations[i:i+batch_size]
             patched_images, locations, shifts = self._random_overlay_get_patch_location_split(
                 images=x_tensor[i:i+batch_size], patch=patch_tensor, scale=scale, mask=mask_tensor[i:i+batch_size] if mask else None, split=split, 
-                split_keep_both=split_keep_both, half_to_keep=half_to_keep, patch_location=patch_location)
+                split_keep_both=split_keep_both, half_to_keep=half_to_keep, patch_location=patch_location, fixed_location_random_scaling=self.fixed_location_random_scaling)
             if i == 0:
                 all_patched_images = patched_images.detach().cpu().numpy()
                 all_locations = locations
