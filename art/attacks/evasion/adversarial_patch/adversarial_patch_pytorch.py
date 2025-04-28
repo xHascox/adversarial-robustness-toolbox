@@ -110,6 +110,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         disguise_distance_factor: float = 1,
         split: bool = False,
         gap_size: int = 0,
+        fixed_gap: bool = False,
         fixed_location_random_scaling: bool | None = None,    ):
         """
         Create an instance of the :class:`.AdversarialPatchPyTorch`.
@@ -149,6 +150,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         :disguise_distance_factor: factor/weight of the disguise distance
         :split: Collusion attack, splits the patch into two
         :gap_size: The gap size when using a collusion attack (2 patchces)
+        :fixed_gap: If True, the gap size is fixed, if False, the gap size is disregared and th epedestrian locations used instead
         :scheduler: CosineAnnealingWarmRestarts or StepLR: The learning rate scheduler to use. 
         :cycle_mult: The cycle multiplier for CosineAnnealingWarmRestarts, makes subsequent cycles longer.
         :decay_step: The step size for the learning rate scheduler. For StepLR, this is the number of epochs after which the decay is applied.
@@ -199,6 +201,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         self.detailed_loss_history = {"classification":[], "disguise":[]}
         self.split = split
         self.gap_size = gap_size
+        self.fixed_gap = fixed_gap
         self.patch_locations = []
         self.fixed_location_random_scaling = fixed_location_random_scaling
         self._check_params()
@@ -569,7 +572,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
                         low=self.scale_min, high=self.scale_max)
                 else:
                     im_scale = scale
-            elif self.patch_locations:
+            elif self.patch_locations and not (self.fixed_gap and prev_patches):
                 # CASE: Patch_Locations are given for each sample in the training data
                 if DEBUG: print("B")
                 if any(self.patch_locations[i_sample]):
@@ -622,7 +625,11 @@ class AdversarialPatchPyTorch(EvasionAttack):
                             low=self.scale_min, high=self.scale_max)
                     else:
                         im_scale = scale
-                
+            elif self.patch_locations and self.fixed_gap and prev_patches:
+                # CASE: we only specified left patch location and set right with a fixed gap
+                if DEBUG: print("D")
+                im_scale = np.random.uniform(
+                                    low=self.scale_min, high=self.scale_max)
             else:
                 # CASE: The same Patch_Location is given for all patches
                 if DEBUG: print("C")
