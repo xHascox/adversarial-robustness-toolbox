@@ -1393,111 +1393,120 @@ class AdversarialPatchPyTorch(EvasionAttack):
         i_step = 0
         best_patch = None
         best_loss = float("inf")
-        # for i_iter in trange(self.max_epochs, desc="Adversarial Patch PyTorch - Epochs", disable=not self.verbose):
-        for i_iter in tqdm(range(self.max_epochs), desc=f"Training Epochs"):
+        try:
+            # for i_iter in trange(self.max_epochs, desc="Adversarial Patch PyTorch - Epochs", disable=not self.verbose):
+            for i_iter in tqdm(range(self.max_epochs), desc=f"Training Epochs"):
 
-            if self.max_steps and i_step >= self.max_steps:
-                break
-            if mask is None:
-                loss_epoch = []
-                prev_loss = sum(
-                    training_loss[-1]) if training_loss else float("nan")
-                prev_loss = prev_loss * \
-                    (-1) if (self._optimizer_string == "pgd") else prev_loss
-                #print(prev_loss)
-                #print(type(prev_loss))
-                #print(f"{prev_loss:.4f}")
-                #print(f"{self.scheduler.base_lrs[0]:.6f}")
-                #print(f"{self.scheduler.get_last_lr()[0]:.6f}")
-                for images, target in tqdm(data_loader, desc=f"Training Steps in Epoch {i_iter+1}/{self.max_epochs}. Previous Loss: {prev_loss} LR = {self.scheduler.get_last_lr()[0]:.6f} Sched BASE LR: {self.scheduler.base_lrs[0]:.6f}", leave=True if self.max_epochs>10 else True):
-                    # for images, target in torchtnt.utils.tqdm.create_progress_bar(data_loader, desc=f"Training Steps max {self.max_epochs} Epochs", num_epochs_completed=i_iter):
-                    if self.max_steps and i_step >= self.max_steps:
-                        break
+                if self.max_steps and i_step >= self.max_steps:
+                    break
+                if mask is None:
+                    loss_epoch = []
+                    prev_loss = sum(
+                        training_loss[-1]) if training_loss else float("nan")
+                    prev_loss = prev_loss * \
+                        (-1) if (self._optimizer_string == "pgd") else prev_loss
+                    #print(prev_loss)
+                    #print(type(prev_loss))
+                    #print(f"{prev_loss:.4f}")
+                    #print(f"{self.scheduler.base_lrs[0]:.6f}")
+                    #print(f"{self.scheduler.get_last_lr()[0]:.6f}")
+                    for images, target in tqdm(data_loader, desc=f"Training Steps in Epoch {i_iter+1}/{self.max_epochs}. Previous Loss: {prev_loss} LR = {self.scheduler.get_last_lr()[0]:.6f} Sched BASE LR: {self.scheduler.base_lrs[0]:.6f}", leave=True if self.max_epochs>10 else True):
+                        # for images, target in torchtnt.utils.tqdm.create_progress_bar(data_loader, desc=f"Training Steps max {self.max_epochs} Epochs", num_epochs_completed=i_iter):
+                        if self.max_steps and i_step >= self.max_steps:
+                            break
 
-                    #### TODO NOTE: This is a Workaround for Issue 2601
-                    #### https://github.com/Trusted-AI/adversarial-robustness-toolbox/issues/2601
-                    #### Traiing seems to modify the detector model so as a workaround we just re-initialize the model for every batch:
-                    if detector_creator:
-                        self.estimator = detector_creator()
-                    
-                    images = images.to(self.estimator.device)
-                    if isinstance(target, torch.Tensor):
-                        target = target.to(self.estimator.device)
-                    else:
-                        targets = []
-                        for idx in range(target["boxes"].shape[0]):
-                            targets.append(
-                                {
-                                    "boxes": target["boxes"][idx].to(self.estimator.device),
-                                    "labels": target["labels"][idx].to(self.estimator.device),
-                                    "scores": target["scores"][idx].to(self.estimator.device),
-                                }
-                            )
-                        target = targets
-                    # TODO UNCOMMENT
-                    loss_train_batch = self._train_step(
-                        images=images, target=target, mask=None)  # TODO TRACCK LOSS
-                    # print("-----")
-                    # print(loss_train_batch.item())
-                    loss_epoch.append(loss_train_batch)
-                    i_step = i_step + 1
+                        #### TODO NOTE: This is a Workaround for Issue 2601
+                        #### https://github.com/Trusted-AI/adversarial-robustness-toolbox/issues/2601
+                        #### Traiing seems to modify the detector model so as a workaround we just re-initialize the model for every batch:
+                        if detector_creator:
+                            self.estimator = detector_creator()
+                        
+                        images = images.to(self.estimator.device)
+                        if isinstance(target, torch.Tensor):
+                            target = target.to(self.estimator.device)
+                        else:
+                            targets = []
+                            for idx in range(target["boxes"].shape[0]):
+                                targets.append(
+                                    {
+                                        "boxes": target["boxes"][idx].to(self.estimator.device),
+                                        "labels": target["labels"][idx].to(self.estimator.device),
+                                        "scores": target["scores"][idx].to(self.estimator.device),
+                                    }
+                                )
+                            target = targets
+                        # TODO UNCOMMENT
+                        loss_train_batch = self._train_step(
+                            images=images, target=target, mask=None)  # TODO TRACCK LOSS
+                        # print("-----")
+                        # print(loss_train_batch.item())
+                        loss_epoch.append(loss_train_batch)
+                        i_step = i_step + 1
 
-            else:
-                for images, target, mask_i in data_loader:
-                    images = images.to(self.estimator.device)
-                    if isinstance(target, torch.Tensor):
-                        target = target.to(self.estimator.device)
-                    else:
-                        targets = []
-                        for idx in range(target["boxes"].shape[0]):
-                            targets.append(
-                                {
-                                    "boxes": target["boxes"][idx].to(self.estimator.device),
-                                    "labels": target["labels"][idx].to(self.estimator.device),
-                                    "scores": target["scores"][idx].to(self.estimator.device),
-                                }
-                            )
-                        target = targets
-                    mask_i = mask_i.to(self.estimator.device)
-                    self._train_step(
-                        images=images, target=target, mask=mask_i)
+                else:
+                    for images, target, mask_i in data_loader:
+                        images = images.to(self.estimator.device)
+                        if isinstance(target, torch.Tensor):
+                            target = target.to(self.estimator.device)
+                        else:
+                            targets = []
+                            for idx in range(target["boxes"].shape[0]):
+                                targets.append(
+                                    {
+                                        "boxes": target["boxes"][idx].to(self.estimator.device),
+                                        "labels": target["labels"][idx].to(self.estimator.device),
+                                        "scores": target["scores"][idx].to(self.estimator.device),
+                                    }
+                                )
+                            target = targets
+                        mask_i = mask_i.to(self.estimator.device)
+                        self._train_step(
+                            images=images, target=target, mask=mask_i)
 
-            training_loss.append(loss_epoch)
-            if sum(loss_epoch) < best_loss:
-                best_loss = sum(loss_epoch)
-                best_patch = self._patch.detach().cpu().numpy()
-            
-            if self._optimizer_string == "Adam":
-                if DEBUG: print(f"Epoch {i_iter + 1}: Learning Rate = {self.scheduler.get_last_lr()}")
-                if self._scheduler_string == "CosineAnnealingWarmRestarts":
-                    if DEBUG: print("BASE LR SCHEDULER", self.scheduler.base_lrs[0])
-                    if i_iter != 0 and i_iter % self.decay_step == 0:
-                        self.scheduler.base_lrs[0] = self.scheduler.base_lrs[0] * self.decay_rate
-                self.scheduler.step()
-                #current_lr = self._optimizer.param_groups[0]['lr']
-                if DEBUG: print(f"Epoch {i_iter + 1}: Learning Rate = {self.scheduler.get_last_lr()}")
+                training_loss.append(loss_epoch)
+                if sum(loss_epoch) < best_loss:
+                    best_loss = sum(loss_epoch)
+                    best_patch = self._patch.detach().cpu().numpy()
+                
+                if self._optimizer_string == "Adam":
+                    if DEBUG: print(f"Epoch {i_iter + 1}: Learning Rate = {self.scheduler.get_last_lr()}")
+                    if self._scheduler_string == "CosineAnnealingWarmRestarts":
+                        if DEBUG: print("BASE LR SCHEDULER", self.scheduler.base_lrs[0])
+                        if i_iter != 0 and i_iter % self.decay_step == 0:
+                            self.scheduler.base_lrs[0] = self.scheduler.base_lrs[0] * self.decay_rate
+                    self.scheduler.step()
+                    #current_lr = self._optimizer.param_groups[0]['lr']
+                    if DEBUG: print(f"Epoch {i_iter + 1}: Learning Rate = {self.scheduler.get_last_lr()}")
 
-            # Write summary
-            if self.summary_writer is not None:  # pragma: no cover
-                x_patched = (
-                    self._random_overlay(
-                        images=torch.from_numpy(x).to(self.estimator.device), patch=self._patch, mask=mask
+                # Write summary
+                if self.summary_writer is not None:  # pragma: no cover
+                    x_patched = (
+                        self._random_overlay(
+                            images=torch.from_numpy(x).to(self.estimator.device), patch=self._patch, mask=mask
+                        )
+                        .detach()
+                        .cpu()
+                        .numpy()
                     )
-                    .detach()
-                    .cpu()
-                    .numpy()
-                )
 
-                self.summary_writer.update(
-                    batch_id=0,
-                    global_step=i_iter,
-                    grad=None,
-                    patch=self._patch,
-                    estimator=self.estimator,
-                    x=x_patched,
-                    y=y,
-                    targeted=self.targeted,
-                )
+                    self.summary_writer.update(
+                        batch_id=0,
+                        global_step=i_iter,
+                        grad=None,
+                        patch=self._patch,
+                        estimator=self.estimator,
+                        x=x_patched,
+                        y=y,
+                        targeted=self.targeted,
+                    )
+
+        except Exception as e:
+            print(f"\n\nPatch Generation Failed with error !!! \n{e}\n")
+            return (
+                best_patch,
+                self._get_circular_patch_mask(nb_samples=1).cpu().numpy()[0],
+                training_loss,
+            )
 
         if self.summary_writer is not None:
             self.summary_writer.reset()
