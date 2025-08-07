@@ -604,9 +604,9 @@ class AdversarialPatchPyTorch(EvasionAttack):
                                 self.patch_location = box_left[1][0]
                                 patch_location_lower_right = box_left[1][1]
                                 im_scale = (box_left[1][1][0] - box_left[1][0][0]) / self.image_shape[self.i_w]
-                            if self.fixed_location_random_scaling:
-                                im_scale = np.random.uniform(
-                                    low=self.scale_min, high=self.scale_max)
+                        if self.fixed_location_random_scaling:
+                            im_scale = np.random.uniform(
+                                low=self.scale_min, high=self.scale_max)
                     else:
                         # SUBSUBCASE: We do a normal attack
                         if DEBUG: print("ATHENE setting location to ", self.patch_locations[i_sample][1][0][0])
