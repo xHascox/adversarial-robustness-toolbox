@@ -523,7 +523,7 @@ class AdversarialPatchPyTorch(EvasionAttack):
         
 
         for i_sample in range(nb_samples):
-            self.patch_location = static_patch_location # reset every iteration so we have not leftovers frfom last iterations in patch_location
+            self.patch_location = static_patch_location # reset every iteration so we have not leftovers from last iterations in patch_location
             if self.patch_location is None and not self.patch_locations:
                 # CASE: Randomly placed and (randomly) scaled patch
                 if scale is None:
